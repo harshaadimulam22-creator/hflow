@@ -894,6 +894,13 @@ def curate(
             )
         elif isinstance(output_location, LocalStorageRoot):
             local_manifest = output_location.path
+            if local_manifest.is_dir():
+                # Fail before the query runs: the final replace onto a
+                # directory would otherwise raise IsADirectoryError after it.
+                raise ValueError(
+                    f"manifest output {local_manifest} is a directory; "
+                    "pass a file path such as <dir>/manifest.parquet"
+                )
             local_manifest.parent.mkdir(parents=True, exist_ok=True)
             # A PRIVATE staging subdirectory, never the output's parent: the
             # constrained allowlist is recursive and covers reads too, so

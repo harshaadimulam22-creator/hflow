@@ -2947,6 +2947,43 @@ def test_curate_rejects_unknown_output_scheme(tmp_path: Path) -> None:
     assert not list(tmp_path.rglob("manifest.parquet"))
 
 
+def test_curate_rejects_an_existing_directory_as_output(tmp_path: Path) -> None:
+    """Refuse a directory output before running the query, and leave it intact."""
+    catalog_root = tmp_path / "catalog"
+    Catalog(catalog_root)
+    output_directory = tmp_path / "manifests"
+    output_directory.mkdir()
+    (output_directory / "keep.txt").write_text("unrelated")
+
+    with pytest.raises(ValueError, match="is a directory"):
+        curate(catalog_root, "SELECT 1 AS one", output=output_directory)
+
+    assert sorted(path.name for path in output_directory.iterdir()) == ["keep.txt"]
+    assert not list(tmp_path.glob(".hflow-manifest-*"))
+
+
+def test_cli_curate_reports_a_directory_output_instead_of_crashing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    Catalog(tmp_path / "catalog")
+    output_directory = tmp_path / "manifests"
+    output_directory.mkdir()
+
+    exit_code = cli_main(
+        [
+            "curate",
+            "SELECT 1 AS one",
+            "--catalog",
+            str(tmp_path / "catalog"),
+            "--output",
+            str(output_directory),
+        ]
+    )
+
+    assert exit_code == 2
+    assert "is a directory" in capsys.readouterr().err
+
+
 def test_curate_file_output_scheme_is_case_insensitive(tmp_path: Path) -> None:
     """Both spellings target the same absolute local manifest path."""
     catalog_root = tmp_path / "catalog"
